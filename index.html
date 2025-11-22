@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 10 Simulator (Simu)</title>
+    <meta name="description" content="Полная симуляция интерфейса Windows 10, созданная с использованием HTML, CSS и JavaScript. Работает в браузере.">
+    <meta name="keywords" content="Windows, Windows 10, Simulator, OS, OS Simu, HTML, CSS, JavaScript, GitHub Pages">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600&display=swap');
+
+        * { box-sizing: border-box; user-select: none; touch-action: none; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; }
+
+        /* ЗАГРУЗКА */
+        #bootScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .loader-ring { position: relative; width: 50px; height: 50px; }
+        .dot { position: absolute; width: 6px; height: 6px; background: white; border-radius: 50%; opacity: 0; animation: winBoot 3s infinite ease-in-out; }
+        .dot:nth-child(1) { animation-delay: 0s; } .dot:nth-child(2) { animation-delay: 0.15s; } .dot:nth-child(3) { animation-delay: 0.3s; } .dot:nth-child(4) { animation-delay: 0.45s; } .dot:nth-child(5) { animation-delay: 0.6s; }
+        @keyframes winBoot { 0% { transform: rotate(0deg) translateX(20px) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 50% { transform: rotate(180deg) translateX(20px) rotate(-180deg); opacity: 1; } 100% { transform: rotate(360deg) translateX(20px) rotate(-360deg); opacity: 0; } }
+
+        /* ЭКРАН И ОБОИ (ГРАДИЕНТ) */
+        .screen { 
+            width: 100vw; 
+            height: 100vh; 
+            /* ГРАДИЕНТ */
+            background: linear-gradient(135deg, #0078D7 0%, #00BFFF 100%); 
+            position: relative; 
+            display: none; 
+        }
+
+        /* ИКОНКИ */
+        .desktop-icon { position: absolute; width: 90px; padding: 5px; display: flex; flex-direction: column; align-items: center; color: white; text-shadow: 1px 1px 3px black; border: 1px solid transparent; }
+        .desktop-icon:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); }
+        .desktop-icon img { width: 48px; height: 48px; margin-bottom: 5px; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+
+        /* ОКНА */
+        .window { position: absolute; top: 50px; left: 50px; background: white; border: 1px solid #0078d7; box-shadow: 0 0 20px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 100; }
+        .window.maximized { top:0!important; left:0!important; width:100%!important; height:calc(100% - 40px)!important; border:none; }
+        .title-bar { height: 30px; display: flex; justify-content: space-between; align-items: center; padding-left: 10px; background: white; flex-shrink: 0; }
+        .window-controls { display: flex; height: 100%; }
+        .control { width: 46px; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #000; }
+        .control:hover { background: #ccc; } .control.close:hover { background: #e81123; color: white; }
+        .window-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        /* DARK EXPLORER */
+        .window.dark-theme { background: #191919; color: white; border: 1px solid #333; }
+        .window.dark-theme .title-bar { background: #191919; color: white; }
+        .window.dark-theme .control { color: white; } .window.dark-theme .control:hover { background: #333; }
+        .explorer-top { height: 40px; background: #191919; display: flex; align-items: center; padding: 0 10px; gap: 10px; border-bottom: 1px solid #333; flex-shrink: 0; }
+        .nav-buttons { color: #999; font-size: 18px; letter-spacing: 5px; cursor: pointer; }
+        .address-input { flex: 1; background: #2d2d2d; border: 1px solid #444; color: white; height: 28px; display: flex; align-items: center; padding: 0 5px; font-size: 12px; gap: 5px; }
+        .search-input { width: 200px; background: #2d2d2d; border: 1px solid #444; color: gray; height: 28px; display: flex; align-items: center; padding-left: 5px; font-size: 12px; }
+        .explorer-layout { display: flex; flex: 1; overflow: hidden; flex-direction: row; }
+        .sidebar { width: 180px; background: #202020; border-right: 1px solid #333; padding-top: 10px; overflow-y: auto; }
+        .sb-item, .sb-sub { padding: 5px 10px; font-size: 13px; color: #ccc; cursor: pointer; }
+        .sb-item:hover, .sb-sub:hover { background: #333; } .sb-sub { padding-left: 30px; } .sb-item.active { background: #333; border-left: 3px solid #0078d7; color: white; }
+        .main-area { flex: 1; background: #191919; padding: 15px; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 10px; }
+        .section-title { width: 100%; font-size: 13px; color: #ccc; border-bottom: 1px solid #444; margin-bottom: 10px; padding-bottom: 5px; }
+        .drives-row, .folders-row { display: flex; gap: 10px; flex-wrap: wrap; width: 100%; margin-bottom: 20px; }
+        .drive-card { width: 250px; height: 60px; display: flex; align-items: center; gap: 10px; padding: 5px; cursor: pointer; } .drive-card:hover { background: #333; }
+        .drive-icon { width: 40px; } .drive-text { flex: 1; } .drive-label { font-size: 13px; color: white; }
+        .drive-bar { width: 100%; height: 14px; background: #444; margin: 3px 0; } .drive-fill { height: 100%; background: #0078d7; } .drive-size { font-size: 11px; color: #aaa; }
+        .status-bar { height: 25px; background: #191919; border-top: 1px solid #333; color: #777; display: flex; align-items: center; padding-left: 10px; font-size: 12px; flex-shrink: 0; }
+
+        /* ПРОВОДНИК: ЭЛЕМЕНТЫ ПАПОК */
+        .file-item { width: 90px; display: flex; flex-direction: column; align-items: center; padding: 5px; cursor: pointer; color: #ddd; font-size: 12px; text-align: center; }
+        .file-item:hover { background: #333; } .file-item img { width: 48px; margin-bottom: 5px; }
+
+        /* PAINT */
+        .paint-toolbar { height: 40px; background: #f1f1f1; display: flex; align-items: center; gap: 5px; padding: 0 10px; border-bottom: 1px solid #ccc; overflow-x: auto; flex-shrink: 0; }
+        .color-btn { width: 20px; height: 20px; border: 1px solid #999; cursor: pointer; flex-shrink: 0; }
+
+        /* КАМЕРА UI */
+        .cam-ui { position:absolute; bottom:20px; width:100%; display:flex; justify-content:center; }
+        .shutter-btn { width:60px; height:60px; background:white; border-radius:50%; cursor:pointer; border:4px solid rgba(255,255,255,0.5); } .shutter-btn:active { background:#ccc; }
+
+        /* ПАРАМЕТРЫ */
+        .settings-content { padding: 20px; height: 100%; overflow-y: auto; }
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, 200px); gap: 10px; justify-content: center; }
+        .set-card { background: white; padding: 15px; border: 1px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 10px; } .set-card:hover { border-color: #999; }
+        .set-card img { width: 32px; }
+        .settings-page { display: flex; height: 100%; }
+        .set-sidebar { width: 200px; background: #e0e0e0; padding: 10px; border-right: 1px solid #ccc; }
+        .set-sidebar button { width: 100%; text-align: left; margin-bottom: 10px; border: none; background: transparent; cursor: pointer; font-weight: bold; }
+        .set-sidebar div { padding: 8px; font-size: 13px; cursor: pointer; } .set-sidebar div.active { background: #fff; border-left: 4px solid #0078d7; }
+        .set-main { flex: 1; padding: 20px; overflow-y: auto; background: white; }
+        .set-row { display: flex; justify-content: space-between; margin-top: 10px; align-items: center; }
+        .switch { position:relative; display:inline-block; width:40px; height:20px; } .switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px; }
+        .slider:before { position:absolute; content:""; height:12px; width:12px; left:4px; bottom:4px; background-color:white; transition:.4s; border-radius:50%; }
+        input:checked + .slider { background-color:#0078d7; } input:checked + .slider:before { transform:translateX(20px); }
+        .app-list-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; } .app-list-item img { width: 32px; }
+
+        /* ПАНЕЛЬ ЗАДАЧ */
+        .taskbar { position: absolute; bottom: 0; width: 100%; height: 40px; background: #101010; display: flex; align-items: center; z-index: 9999; border-top: 1px solid #222; }
+        .start-btn { width: 48px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; } .start-btn:hover { background: #333; }
+        .search-bar { width: 350px; height: 100%; background: white; display: flex; align-items: center; padding-left: 10px; color: gray; font-size: 13px; } .search-bar input { border: none; outline: none; width: 100%; height: 100%; margin-left: 5px; }
+        .taskbar-apps { flex: 1; display: flex; height: 100%; padding-left: 10px; }
+        .tb-icon { width: 48px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; position: relative; transition: 0.2s; } .tb-icon:hover { background: rgba(255,255,255,0.1); }
+        .tb-icon.active { background: rgba(255,255,255,0.2); border-bottom: 2px solid #76b9ed; } .tb-icon img { width: 24px; }
+        .tray { display: flex; color: white; padding-right: 10px; font-size: 12px; gap: 15px; align-items: center; }
+
+        /* ПУСК (3 КОЛОНКИ) */
+        .start-menu { position: absolute; bottom: 40px; left: 0; width: 650px; height: 500px; background: #1f1f1f; color: white; display: none; z-index: 9998; flex-direction: row; } .start-menu.active { display: flex; }
+        .start-sidebar { width: 48px; display: flex; flex-direction: column; align-items: center; padding-bottom: 10px; background: #1f1f1f; }
+        .s-btn { width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; cursor: pointer; } .s-btn:hover { background: rgba(255,255,255,0.1); }
+        .start-list { width: 220px; overflow-y: auto; padding: 10px; }
+        .list-group { font-size: 12px; font-weight: bold; padding: 10px 15px 5px; }
+        .app-item { display: flex; align-items: center; gap: 10px; padding: 8px 15px; font-size: 13px; cursor: pointer; } .app-item:hover { background: rgba(255,255,255,0.1); } .app-item img { width: 24px; }
+        .start-tiles { flex: 1; padding: 10px 20px; overflow-y: auto; }
+        .tile-header { font-size: 12px; margin-bottom: 10px; }
+        .tiles-grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 4px; }
+        .tile { width: 100px; height: 100px; background: #0078d7; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 5px; text-align: center; } .tile:hover { outline: 2px solid rgba(255,255,255,0.5); }
+        .tile img { width: 32px; margin-bottom: 5px; } .tile span { font-size: 11px; }
+        .tile.wide { grid-column: span 2; width: 204px; flex-direction: row; justify-content: flex-start; padding-left: 15px; }
+    </style>
+</head>
+<body>
+
+<div id="bootScreen">
+  <div class="boot-content">
+    <svg width="100" height="100" viewBox="0 0 24 24" fill="#00adef" style="margin-bottom: 60px;">
+       <path d="M0 3.44L9.83 2.05V11.36H0V3.44ZM10.87 1.9L24 0V11.36H10.87V1.9ZM0 12.55H9.83V21.86L0 20.47V12.55ZM10.87 12.55H24V24L10.87 21.9V12.55Z"/>
+    </svg>
+    <div class="loader-ring"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  </div>
+</div>
+
+<div class="screen" id="mainScreen">
+
+  <div class="desktop-icon draggable" id="icon-pc" style="top: 20px; left: 20px;" ondblclick="openWindow('computer')">
+    <img src="https://img.icons8.com/fluency/96/000000/monitor--v1.png">
+    <span>Этот компьютер</span>
+  </div>
+
+  <div class="desktop-icon draggable" id="icon-bin" style="top: 130px; left: 20px;" ondblclick="openWindow('recycleBin')">
+    <img id="bin-img" src="https://img.icons8.com/color/48/000000/full-trash.png">
+    <span>Корзина</span>
+  </div>
+
+  <div class="window dark-theme" id="computer" data-app="computer" style="width: 850px; height: 550px;">
+    <div class="title-bar">
+      <div class="title-text" id="explorerTitle">Этот компьютер</div>
+      <div class="window-controls">
+        <div class="control" onclick="minimizeWindow('computer')">─</div>
+        <div class="control" onclick="toggleMaximize('computer')">□</div>
+        <div class="control close" onclick="closeWindow('computer')">✕</div>
+      </div>
+    </div>
+    <div class="explorer-top">
+       <div class="nav-buttons">
+          <span onclick="navBack()">🡠</span>
+          <span onclick="navUp()">🡡</span>
+       </div>
+       <div class="address-input">
+          <img src="https://img.icons8.com/fluency/48/000000/monitor--v1.png" width="16">
+          <span id="pathText">Этот компьютер</span>
+       </div>
+       <div class="search-input">Поиск</div>
+    </div>
+    <div class="window-content explorer-layout">
+       <div class="sidebar">
+          <div class="sb-item" onclick="navigate('root')">★ Быстрый доступ</div>
+          <div class="sb-item active" onclick="navigate('root')">💻 Этот компьютер</div>
+          <div class="sb-sub" onclick="navigate('c')">📁 Диск (C:)</div>
+          <div class="sb-item">🌐 Сеть</div>
+       </div>
+       <div class="main-area" id="explorerView">
+          </div>
+    </div>
+    <div class="status-bar" id="statusText">Элементов: 0</div>
+  </div>
+
+  <div class="window" id="settings" data-app="settings" style="width: 900px; height: 600px; background:#f0f0f0">
+     <div class="title-bar" style="background:white"><div class="title-text">Параметры</div><div class="window-controls"><div class="control" onclick="minimizeWindow('settings')">─</div><div class="control" onclick="toggleMaximize('settings')">□</div><div class="control close" onclick="closeWindow('settings')">✕</div></div></div>
+     
+     <div class="settings-content" id="set-home">
+        <h2 style="text-align:center; font-weight:300;">Параметры Windows</h2>
+        <div class="settings-grid">
+           <div class="set-card" onclick="openSetPage('system')">
+              <img src="https://img.icons8.com/fluent/48/000000/laptop.png">
+              <div><b>Система</b><br>Экран, звук</div>
+           </div>
+           <div class="set-card" onclick="openSetPage('personal')">
+              <img src="https://img.icons8.com/fluent/48/000000/paint-palette.png">
+              <div><b>Персонализация</b><br>Фон, цвета</div>
+           </div>
+           <div class="set-card" onclick="openSetPage('apps')">
+              <img src="https://img.icons8.com/fluent/48/000000/apps-tab.png">
+              <div><b>Приложения</b><br>Удаление</div>
+           </div>
+           <div class="set-card" onclick="openSetPage('update')">
+              <img src="https://img.icons8.com/fluent/48/000000/update-left-rotation.png">
+              <div><b>Обновление</b><br>Центр обновлений</div>
+           </div>
+        </div>
+     </div>
+
+     <div class="settings-page" id="set-system" style="display:none;">
+        <div class="set-sidebar">
+           <button onclick="closeSetPage()">🡠 Главная</button>
+           <div class="active">Дисплей</div>
+           <div>Звук</div>
+           <div>Уведомления</div>
+        </div>
+        <div class="set-main">
+           <h1>Дисплей</h1>
+           <p>Яркость и цвет</p>
+           <input type="range" style="width:100%">
+           <br><br>
+           <div class="set-row">
+              <span>Ночной свет</span>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+           </div>
+        </div>
+     </div>
+
+     <div class="settings-page" id="set-personal" style="display:none;">
+        <div class="set-sidebar">
+           <button onclick="closeSetPage()">🡠 Главная</button>
+           <div class="active">Фон</div>
+           <div>Цвета</div>
+           <div>Темы</div>
+        </div>
+        <div class="set-main">
+           <h1>Фон</h1>
+           <div style="width:200px; height:120px; background:linear-gradient(135deg, #0078D7, #00BFFF); background-size:cover; margin-bottom:20px; border:1px solid #ccc;"></div>
+           <div class="set-row">
+              <span>Выбор фона</span>
+              <select><option>Фото</option><option>Сплошной цвет</option></select>
+           </div>
+        </div>
+     </div>
+
+     <div class="settings-page" id="set-apps" style="display:none;">
+        <div class="set-sidebar"><button onclick="closeSetPage()">🡠 Главная</button><div class="active">Приложения</div></div>
+        <div class="set-main">
+           <h1>Приложения и возможности</h1>
+           <div class="app-list-item"><img src="https://img.icons8.com/fluency/48/000000/paint.png"> Paint <span>12 МБ</span></div>
+           <div class="app-list-item"><img src="https://img.icons8.com/fluency/48/000000/camera.png"> Камера <span>5 МБ</span></div>
+        </div>
+     </div>
+
+     <div class="settings-page" id="set-update" style="display:none;">
+        <div class="set-sidebar"><button onclick="closeSetPage()">🡠 Главная</button><div class="active">Центр обновлений</div></div>
+        <div class="set-main">
+           <h1>Центр обновления Windows</h1>
+           <p>✅ У вас установлены последние обновления</p>
+           <button style="padding:5px 10px;">Проверить наличие обновлений</button>
+        </div>
+     </div>
+
+  </div>
+
+  <div class="window" id="paint" data-app="paint" style="width: 700px; height: 500px;">
+     <div class="title-bar"><div class="title-text">Безымянный - Paint</div><div class="window-controls"><div class="control" onclick="minimizeWindow('paint')">─</div><div class="control" onclick="toggleMaximize('paint')">□</div><div class="control close" onclick="closeWindow('paint')">✕</div></div></div>
+    <div class="paint-toolbar">
+       <div class="color-btn" style="background:black" onclick="setColor('black')"></div>
+       <div class="color-btn" style="background:#880015" onclick="setColor('#880015')"></div>
+       <div class="color-btn" style="background:red" onclick="setColor('red')"></div>
+       <div class="color-btn" style="background:orange" onclick="setColor('orange')"></div>
+       <div class="color-btn" style="background:yellow" onclick="setColor('yellow')"></div>
+       <div class="color-btn" style="background:green" onclick="setColor('green')"></div>
+       <div class="color-btn" style="background:cyan" onclick="setColor('cyan')"></div>
+       <div class="color-btn" style="background:blue" onclick="setColor('blue')"></div>
+       <div class="color-btn" style="background:purple" onclick="setColor('purple')"></div>
+       <div class="color-btn" style="background:white; border:1px solid #ccc" onclick="setColor('white')" title="Ластик"></div>
+       <button onclick="clearCanvas()" style="margin-left:auto; padding: 2px 10px;">Очистить</button>
+    </div>
+    <div class="window-content" style="background:white; padding:0; flex:1; display:flex;">
+       <canvas id="paintCanvas" style="width:100%; height:100%; touch-action:none;"></canvas>
+    </div>
+  </div>
+
+  <div class="window" id="edge" data-app="edge" style="width: 900px; height: 650px;">
+      <div class="title-bar"><div class="title-text">Microsoft Edge</div><div class="window-controls"><div class="control" onclick="minimizeWindow('edge')">─</div><div class="control" onclick="toggleMaximize('edge')">□</div><div class="control close" onclick="closeWindow('edge')">✕</div></div></div>
+      <div class="window-content" style="padding:0; flex:1; display:flex;">
+         <iframe src="https://ru.m.wikipedia.org/wiki/Windows_10" style="width:100%; height:100%; border:none; flex:1;"></iframe>
+      </div>
+  </div>
+
+  <div class="window" id="camera" data-app="camera" style="width: 600px; height: 450px; background:black;">
+     <div class="title-bar" style="background:black; color:white; border:none;">
+      <div class="title-text">Камера</div>
+      <div class="window-controls"><div class="control" onclick="minimizeWindow('camera')">─</div><div class="control" onclick="toggleMaximize('camera')">□</div><div class="control close" onclick="closeWindow('camera'); stopCamera()" style="color:white">✕</div></div>
+    </div>
+    <div class="window-content" style="display:flex; justify-content:center; align-items:center; color:white; position:relative;">
+       <video id="camVideo" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+       <div id="camMsg">Нажмите, чтобы включить камеру</div>
+       <div class="cam-ui" onclick="alert('Фото сохранено')"><div class="shutter-btn"></div></div>
+    </div>
+  </div>
+  
+  <div class="window" id="recycleBin" data-app="bin" style="width: 600px; height: 400px;">
+    <div class="title-bar"><div class="title-text">Корзина</div><div class="window-controls"><div class="control" onclick="minimizeWindow('recycleBin')">─</div><div class="control" onclick="toggleMaximize('recycleBin')">□</div><div class="control close" onclick="closeWindow('recycleBin')">✕</div></div></div>
+    <div class="explorer-top" style="background:#f5f5f5; justify-content: flex-start;">
+       <button onclick="emptyBin()">♻ Очистить корзину</button>
+    </div>
+    <div class="window-content" style="background:white; padding:20px; color:gray;" id="binContent">Корзина пуста</div>
+  </div>
+
+  <div class="taskbar">
+    <div class="start-btn" onclick="toggleStartMenu()">
+       <svg viewBox="0 0 24 24" width="20" fill="white"><path d="M0 3.4L9.8 2V11.3H0V3.4ZM10.9 1.9L24 0V11.3H10.9V1.9ZM0 12.5H9.8V21.8L0 20.4V12.5ZM10.9 12.5H24V24L10.9 21.9V12.5Z"/></svg>
+    </div>
+    
+    <div class="search-bar">
+       <span>🔎</span>
+       <input type="text" placeholder="Введите здесь текст для поиска">
+    </div>
+
+    <div class="taskbar-apps">
+       <div class="tb-icon" id="tb-computer" onclick="toggleWindow('computer')"><img src="https://img.icons8.com/fluency/48/000000/monitor--v1.png" width="24"></div>
+       <div class="tb-icon" id="tb-edge" onclick="toggleWindow('edge')"><img src="https://upload.wikimedia.org/wikipedia/commons/9/98/Microsoft_Edge_logo_%282019%29.svg" width="24"></div>
+       <div class="tb-icon" id="tb-settings" onclick="toggleWindow('settings')"><img src="https://img.icons8.com/fluent/48/000000/settings.png" width="24"></div>
+    </div>
+
+    <div class="tray">
+       <div class="tray-icon">˄</div>
+       <div class="tray-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/wifi--v1.png" width="16"></div>
+       <div class="tray-icon" id="batteryText">🔋 100%</div>
+       <div class="clock" id="clock">12:00</div>
+       <div class="tray-icon">🗨</div>
+    </div>
+  </div>
+
+  <div class="start-menu" id="startMenu">
+     
+     <div class="start-sidebar">
+        <div class="s-btn" title="Пуск">≡</div>
+        <div style="flex:1"></div>
+        <div class="s-btn" title="Параметры" onclick="openWindow('settings')"><img src="https://img.icons8.com/ios-glyphs/30/ffffff/gear.png" width="20"></div>
+        <div class="s-btn" title="Выключение"><img src="https://img.icons8.com/ios-glyphs/30/ffffff/shutdown.png" width="20"></div>
+     </div>
+
+     <div class="start-list">
+        <div class="list-group">#</div>
+        <div class="app-item" onclick="openWindow('paint')"><img src="https://img.icons8.com/fluency/48/000000/paint.png"> Paint</div>
+        <div class="list-group">E</div>
+        <div class="app-item" onclick="openWindow('edge')"><img src="https://upload.wikimedia.org/wikipedia/commons/9/98/Microsoft_Edge_logo_%282019%29.svg"> Microsoft Edge</div>
+        <div class="list-group">K</div>
+        <div class="app-item" onclick="openWindow('camera'); startCamera()"><img src="https://img.icons8.com/fluency/48/000000/camera.png"> Камера</div>
+        <div class="list-group">П</div>
+        <div class="app-item" onclick="openWindow('settings')"><img src="https://img.icons8.com/fluent/48/000000/settings.png"> Параметры</div>
+        <div class="app-item" onclick="openWindow('computer')"><img src="https://img.icons8.com/fluency/48/000000/monitor--v1.png"> Проводник</div>
+     </div>
+
+     <div class="start-tiles">
+        <div class="tile-header">События и общение</div>
+        <div class="tiles-grid">
+           <div class="tile medium" style="background:#0078d7" onclick="openWindow('edge')">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/Microsoft_Edge_logo_%282019%29.svg">
+              <span>Edge</span>
+           </div>
+           <div class="tile medium" style="background:#1f1f1f" onclick="openWindow('camera'); startCamera()">
+              <img src="https://img.icons8.com/fluency/48/000000/camera.png">
+              <span>Камера</span>
+           </div>
+           <div class="tile medium" style="background:#0078d7" onclick="openWindow('settings')">
+              <img src="https://img.icons8.com/fluent/48/ffffff/settings.png">
+              <span>Параметры</span>
+           </div>
+           <div class="tile wide" style="background:#0078d7" onclick="openWindow('paint')">
+              <div style="display:flex; align-items:center; gap:10px;">
+                 <img src="https://img.icons8.com/fluency/48/000000/paint.png">
+                 <span>Paint 3D</span>
+              </div>
+           </div>
+        </div>
+     </div>
+
+  </div>
+
+</div>
+
+<script>
+/* 1. ЗАГРУЗКА И СИСТЕМНОЕ ВРЕМЯ/БАТАРЕЯ */
+window.onload = function() {
+    setTimeout(() => {
+        document.getElementById('bootScreen').style.display = 'none';
+        document.getElementById('mainScreen').style.display = 'block';
+    }, 3000);
+    
+    function updateBatteryDisplay(battery) {
+        const percent = Math.round(battery.level * 100);
+        let icon = '🔋';
+        if (battery.charging) icon = '⚡';
+        else if (percent < 20) icon = '🪫';
+        else if (percent > 80) icon = '🟩';
+        document.getElementById('batteryText').innerText = `${icon} ${percent}%`;
+    }
+
+    if (navigator.getBattery) {
+        navigator.getBattery().then(battery => {
+            updateBatteryDisplay(battery);
+            battery.addEventListener('levelchange', () => updateBatteryDisplay(battery));
+            battery.addEventListener('chargingchange', () => updateBatteryDisplay(battery));
+        }).catch(() => {
+            document.getElementById('batteryText').innerText = '🔋 100%';
+        });
+    } else {
+        document.getElementById('batteryText').innerText = '🔋 100%';
+    }
+    
+    // Часы
+    setInterval(() => {
+        const d = new Date();
+        document.getElementById('clock').innerText = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }, 1000);
+};
+
+/* 2. ОКОННАЯ СИСТЕМА */
+let zIndex = 100;
+
+function openWindow(id) {
+    const win = document.getElementById(id);
+    win.style.display = 'flex';
+    win.classList.remove('maximized');
+    win.style.zIndex = ++zIndex;
+    document.getElementById('startMenu').classList.remove('active');
+    
+    const appId = win.getAttribute('data-app');
+    const tbIcon = document.getElementById('tb-' + appId);
+    if(tbIcon) {
+        // Убираем активность со всех иконок, кроме активной
+        document.querySelectorAll('.tb-icon').forEach(icon => icon.classList.remove('active'));
+        tbIcon.classList.add('active');
+    }
+    
+    if(id === 'paint') setTimeout(resizeCanvas, 100);
+    if(id === 'computer') navigate('root');
+}
+
+function closeWindow(id) {
+    const win = document.getElementById(id);
+    win.style.display = 'none';
+    const appId = win.getAttribute('data-app');
+    const tbIcon = document.getElementById('tb-' + appId);
+    if(tbIcon) tbIcon.classList.remove('active');
+    if(id === 'camera') stopCamera();
+}
+
+function minimizeWindow(id) { document.getElementById(id).style.display = 'none'; }
+function toggleMaximize(id) { document.getElementById(id).classList.toggle('maximized'); }
+
+// Логика свернуть/развернуть из панели задач
+function toggleWindow(appId) {
+    const win = document.querySelector(`.window[data-app="${appId}"]`);
+    const tbIcon = document.getElementById('tb-' + appId);
+
+    if (!win) return;
+    
+    if (win.style.display === 'flex') {
+        // Окно открыто -> Свернуть
+        win.style.display = 'none';
+        tbIcon.classList.remove('active');
+    } else {
+        // Окно свернуто или закрыто -> Открыть/Развернуть
+        openWindow(win.id);
+        win.style.display = 'flex'; // Принудительно развернуть
+        tbIcon.classList.add('active'); // Активировать иконку
+    }
+}
+
+function toggleStartMenu() { document.getElementById('startMenu').classList.toggle('active'); }
+
+/* 3. ПЕРЕТАСКИВАНИЕ */
+function makeDraggable(el, handle) {
+  let isDown = false, startX, startY, initX, initY;
+  const start = (x, y) => {
+     if(el.classList.contains('maximized')) return;
+     isDown = true; startX = x; startY = y;
+     const rect = el.getBoundingClientRect(); initX = rect.left; initY = rect.top;
+     el.style.zIndex = ++zIndex;
+  };
+  handle.addEventListener('mousedown', e => start(e.clientX, e.clientY));
+  handle.addEventListener('touchstart', e => start(e.touches[0].clientX, e.touches[0].clientY), {passive:false});
+  
+  const move = (x, y) => {
+     if(!isDown) return;
+     el.style.left = (initX + x - startX) + 'px';
+     el.style.top = (initY + y - startY) + 'px';
+  };
+  window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+  window.addEventListener('touchmove', e => { if(isDown) e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY) }, {passive:false});
+  const end = () => isDown = false;
+  window.addEventListener('mouseup', end); window.addEventListener('touchend', end);
+}
+document.querySelectorAll('.window').forEach(w => makeDraggable(w, w.querySelector('.title-bar')));
+document.querySelectorAll('.desktop-icon.draggable').forEach(i => makeDraggable(i, i));
+
+/* 4. ПРОВОДНИК (ФАЙЛОВАЯ СИСТЕМА) */
+const fs = {
+    'root': { type: 'root', items: [], pathName: 'Этот компьютер' },
+    'c': { type: 'folder', pathName: 'Локальный диск (C:)', items: [
+        {name: 'Windows', type: 'folder'}, {name: 'Users', type: 'folder'}, {name: 'Program Files', type: 'folder'}
+    ]},
+    'c_windows': { type: 'folder', pathName: 'Windows', items: [{name: 'System32', type: 'folder'}, {name: 'Boot', type: 'folder'}] },
+    'c_users': { type: 'folder', pathName: 'Users', items: [{name: 'Admin', type: 'folder'}, {name: 'Public', type: 'folder'}] },
+    'c_program_files': { type: 'folder', pathName: 'Program Files', items: [{name: 'Windows Defender', type: 'folder'}, {name: 'Internet Explorer', type: 'folder'}] }
+};
+let currentPath = 'root';
+let pathHistory = ['root'];
+
+function resolvePath(name) {
+    if (name === 'c') return 'c';
+    if (name === 'Windows') return 'c_windows';
+    if (name === 'Users') return 'c_users';
+    if (name === 'Program Files') return 'c_program_files';
+    return null; // В текущей простой структуре не идем дальше
+}
+
+function navigate(path) {
+    let newPathKey = resolvePath(path);
+    
+    if (path === 'root') newPathKey = 'root';
+    else if (!newPathKey) newPathKey = currentPath; // Остаемся на месте, если путь не найден
+    
+    currentPath = newPathKey;
+    
+    // Обновляем историю пути (если путь изменился)
+    if(pathHistory[pathHistory.length - 1] !== currentPath) {
+        // Очищаем историю, если вернулись назад по дереву
+        const index = pathHistory.indexOf(currentPath);
+        if (index > -1) pathHistory.splice(index + 1);
+        else pathHistory.push(currentPath);
+    }
+    
+    renderExplorer();
+}
+
+function navBack() {
+    if(pathHistory.length > 1) {
+        pathHistory.pop();
+        currentPath = pathHistory[pathHistory.length-1];
+        renderExplorer();
+    }
+}
+function navUp() { navBack(); } // Упрощенно, совпадает с "Назад"
+
+function renderExplorer() {
+    const view = document.getElementById('explorerView');
+    const pathTxt = document.getElementById('pathText');
+    const titleTxt = document.getElementById('explorerTitle');
+    const data = fs[currentPath];
+    
+    pathTxt.innerText = data.pathName;
+    titleTxt.innerText = data.pathName;
+    view.innerHTML = '';
+    
+    if (currentPath === 'root') {
+        // Рисуем диски
+        view.innerHTML = `
+        <div class="section-title">▼ Устройства и диски (2)</div>
+        <div class="drives-row">
+             <div class="drive-card" onclick="navigate('c')">
+                <img src="https://img.icons8.com/color/48/000000/hdd.png" class="drive-icon">
+                <div class="drive-text">
+                   <div class="drive-label">Windows (C:)</div>
+                   <div class="drive-bar"><div class="drive-fill" style="width: 70%;"></div></div>
+                   <div class="drive-size">28 ГБ свободно из 118 ГБ</div>
+                </div>
+             </div>
+             <div class="drive-card">
+                <img src="https://img.icons8.com/color/48/000000/hdd.png" class="drive-icon">
+                <div class="drive-text">
+                   <div class="drive-label">Data (D:)</div>
+                   <div class="drive-bar"><div class="drive-fill" style="width: 20%;"></div></div>
+                   <div class="drive-size">800 ГБ свободно из 1 ТБ</div>
+                </div>
+             </div>
+        </div>`;
+    } else {
+        // Рисуем папки
+        data.items.forEach(item => {
+            view.innerHTML += `
+            <div class="file-item" onclick="navigate('${item.name}')">
+                <img src="https://img.icons8.com/color/48/000000/folder-invoices--v1.png">
+                <span>${item.name}</span>
+            </div>`;
+        });
+    }
+    document.getElementById('statusText').innerText = 'Элементов: ' + (data.items ? data.items.length : 2);
+}
+
+
+/* 5. НАСТРОЙКИ (ЛОГИКА) */
+function openSetPage(pageId) {
+    document.getElementById('set-home').style.display = 'none';
+    document.getElementById('set-' + pageId).style.display = 'flex';
+}
+function closeSetPage() {
+    document.querySelectorAll('.settings-page').forEach(p => p.style.display = 'none');
+    document.getElementById('set-home').style.display = 'block';
+}
+
+/* 6. PAINT */
+const canvas = document.getElementById('paintCanvas');
+const c = canvas.getContext('2d');
+let p = false, color = 'black';
+function resizeCanvas() { 
+    canvas.width = canvas.offsetWidth; 
+    canvas.height = canvas.offsetHeight; 
+}
+const draw = (x,y) => { if(!p) return; c.lineWidth=5; c.lineCap='round'; c.strokeStyle=color; c.lineTo(x,y); c.stroke(); c.beginPath(); c.moveTo(x,y); };
+const getPos = (e) => { const r = canvas.getBoundingClientRect(); return [ (e.clientX||e.touches[0].clientX)-r.left, (e.clientY||e.touches[0].clientY)-r.top ]; }
+canvas.addEventListener('mousedown', e => { p=true; const [x,y]=getPos(e); c.beginPath(); c.moveTo(x,y); draw(x,y); });
+canvas.addEventListener('touchstart', e => { p=true; const [x,y]=getPos(e); c.beginPath(); c.moveTo(x,y); draw(x,y); }, {passive:false});
+canvas.addEventListener('mousemove', e => { const [x,y]=getPos(e); draw(x,y); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); const [x,y]=getPos(e); draw(x,y); }, {passive:false});
+window.addEventListener('mouseup', ()=> { p=false; c.beginPath(); }); window.addEventListener('touchend', ()=> { p=false; c.beginPath(); });
+function setColor(cl) { color = cl; }
+function clearCanvas() { c.clearRect(0,0,canvas.width,canvas.height); }
+
+/* 7. КАМЕРА */
+function startCamera() {
+   navigator.mediaDevices.getUserMedia({video:true}).then(s => {
+       document.getElementById('camVideo').srcObject = s;
+       document.getElementById('camMsg').style.display = 'none';
+   }).catch(() => document.getElementById('camMsg').innerText = "Нет доступа к камере");
+}
+function stopCamera() {
+    const v = document.getElementById('camVideo');
+    if(v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop());
+}
+
+/* 8. КОРЗИНА */
+function emptyBin() { document.getElementById('binContent').innerHTML='<div style="width:100%;text-align:center;color:gray;margin-top:50px">Корзина пуста</div>'; }
+</script>
+
+</body>
+</html>
