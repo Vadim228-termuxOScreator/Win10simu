@@ -23,11 +23,18 @@
         /* ЭКРАН И ОБОИ (ГРАДИЕНТ) */
         .screen { 
             width: 100vw; 
-            height: 100vh; 
+            /* Высота с учетом панели задач */
+            height: calc(100vh - 40px); 
+            /* Панель задач снизу, поэтому экран сверху */
+            margin-top: 0;
+            
             /* ГРАДИЕНТ */
             background: linear-gradient(135deg, #0078D7 0%, #00BFFF 100%); 
-            position: relative; 
+            position: absolute; 
+            top: 0; /* Прикрепить к верху */
+            left: 0;
             display: none; 
+            z-index: 9990; /* Ниже таскбара */
         }
 
         /* ИКОНКИ */
@@ -36,9 +43,14 @@
         .desktop-icon img { width: 48px; height: 48px; margin-bottom: 5px; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 
         /* ОКНА */
-        .window { position: absolute; top: 50px; left: 50px; background: white; border: 1px solid #0078d7; box-shadow: 0 0 20px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 100; }
-        .window.maximized { top:0!important; left:0!important; width:100%!important; height:calc(100% - 40px)!important; border:none; }
-        .title-bar { height: 30px; display: flex; justify-content: space-between; align-items: center; padding-left: 10px; background: white; flex-shrink: 0; }
+        .window { 
+            position: absolute; top: 50px; left: 50px; background: white; border: 1px solid #0078d7; box-shadow: 0 0 20px rgba(0,0,0,0.5); display: none; flex-direction: column; z-index: 100;
+            /* Чтобы окна не вылезали за таскбар */
+            max-height: calc(100vh - 40px);
+            overflow: hidden;
+        }
+        .window.maximized { top:0!important; left:0!important; width:100%!important; height:calc(100vh - 40px)!important; border:none; }
+        .title-bar { height: 30px; display: flex; justify-content: space-between; align-items: center; padding-left: 10px; background: white; flex-shrink: 0; cursor: grab; }
         .window-controls { display: flex; height: 100%; }
         .control { width: 46px; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #000; }
         .control:hover { background: #ccc; } .control.close:hover { background: #e81123; color: white; }
@@ -94,8 +106,12 @@
         .app-list-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; } .app-list-item img { width: 32px; }
 
         /* ПАНЕЛЬ ЗАДАЧ */
-        .taskbar { position: absolute; bottom: 0; width: 100%; height: 40px; background: #101010; display: flex; align-items: center; z-index: 9999; border-top: 1px solid #222; }
-        .start-btn { width: 48px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; } .start-btn:hover { background: #333; }
+        .taskbar { position: fixed; bottom: 0; width: 100%; height: 40px; background: #101010; display: flex; align-items: center; z-index: 9999; border-top: 1px solid #222; }
+        .start-btn { width: 48px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; } 
+        .start-btn:hover { background: #333; }
+        /* Дополнительный класс для подсветки кнопки Пуск, когда меню открыто */
+        .start-btn.active { background: rgba(255,255,255,0.2); } 
+        
         .search-bar { width: 350px; height: 100%; background: white; display: flex; align-items: center; padding-left: 10px; color: gray; font-size: 13px; } .search-bar input { border: none; outline: none; width: 100%; height: 100%; margin-left: 5px; }
         .taskbar-apps { flex: 1; display: flex; height: 100%; padding-left: 10px; }
         .tb-icon { width: 48px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; position: relative; transition: 0.2s; } .tb-icon:hover { background: rgba(255,255,255,0.1); }
@@ -103,7 +119,8 @@
         .tray { display: flex; color: white; padding-right: 10px; font-size: 12px; gap: 15px; align-items: center; }
 
         /* ПУСК (3 КОЛОНКИ) */
-        .start-menu { position: absolute; bottom: 40px; left: 0; width: 650px; height: 500px; background: #1f1f1f; color: white; display: none; z-index: 9998; flex-direction: row; } .start-menu.active { display: flex; }
+        .start-menu { position: absolute; bottom: 40px; left: 0; width: 650px; height: 500px; background: #1f1f1f; color: white; display: none; z-index: 9998; flex-direction: row; } 
+        .start-menu.active { display: flex; }
         .start-sidebar { width: 48px; display: flex; flex-direction: column; align-items: center; padding-bottom: 10px; background: #1f1f1f; }
         .s-btn { width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; cursor: pointer; } .s-btn:hover { background: rgba(255,255,255,0.1); }
         .start-list { width: 220px; overflow-y: auto; padding: 10px; }
@@ -302,7 +319,7 @@
   </div>
 
   <div class="taskbar">
-    <div class="start-btn" onclick="toggleStartMenu()">
+    <div class="start-btn" id="startBtn" onclick="toggleStartMenu()">
        <svg viewBox="0 0 24 24" width="20" fill="white"><path d="M0 3.4L9.8 2V11.3H0V3.4ZM10.9 1.9L24 0V11.3H10.9V1.9ZM0 12.5H9.8V21.8L0 20.4V12.5ZM10.9 12.5H24V24L10.9 21.9V12.5Z"/></svg>
     </div>
     
@@ -378,11 +395,13 @@
 <script>
 /* 1. ЗАГРУЗКА И СИСТЕМНОЕ ВРЕМЯ/БАТАРЕЯ */
 window.onload = function() {
+    // 1.1. Анимация загрузки
     setTimeout(() => {
         document.getElementById('bootScreen').style.display = 'none';
         document.getElementById('mainScreen').style.display = 'block';
     }, 3000);
     
+    // 1.2. Обновление Батареи (оставлено как заглушка, так как доступ к API сложен)
     function updateBatteryDisplay(battery) {
         const percent = Math.round(battery.level * 100);
         let icon = '🔋';
@@ -404,14 +423,17 @@ window.onload = function() {
         document.getElementById('batteryText').innerText = '🔋 100%';
     }
     
-    // Часы
-    setInterval(() => {
+    // 1.3. Часы
+    function updateClock() {
         const d = new Date();
-        document.getElementById('clock').innerText = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    }, 1000);
+        const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        document.getElementById('clock').innerText = time;
+    }
+    updateClock(); // Запуск сразу
+    setInterval(updateClock, 1000); // Обновление каждую секунду
 };
 
-/* 2. ОКОННАЯ СИСТЕМА */
+/* 2. ОКОННАЯ СИСТЕМА И ПУСК */
 let zIndex = 100;
 
 function openWindow(id) {
@@ -419,7 +441,10 @@ function openWindow(id) {
     win.style.display = 'flex';
     win.classList.remove('maximized');
     win.style.zIndex = ++zIndex;
+    
+    // Закрыть Пуск при открытии окна
     document.getElementById('startMenu').classList.remove('active');
+    document.getElementById('startBtn').classList.remove('active');
     
     const appId = win.getAttribute('data-app');
     const tbIcon = document.getElementById('tb-' + appId);
@@ -464,7 +489,30 @@ function toggleWindow(appId) {
     }
 }
 
-function toggleStartMenu() { document.getElementById('startMenu').classList.toggle('active'); }
+// **ОСНОВНАЯ ФУНКЦИЯ ДЛЯ ПУСКА**
+function toggleStartMenu() { 
+    const startMenu = document.getElementById('startMenu');
+    const startBtn = document.getElementById('startBtn');
+    
+    startMenu.classList.toggle('active'); 
+    startBtn.classList.toggle('active');
+}
+
+// Закрытие Пуска по клику вне его 
+document.addEventListener('mousedown', function(e) {
+    const startMenu = document.getElementById('startMenu');
+    const startButton = document.getElementById('startBtn');
+    
+    // Если меню открыто И клик был НЕ по меню И НЕ по кнопке Пуск
+    if (startMenu.classList.contains('active') && 
+        !startMenu.contains(e.target) && 
+        !startButton.contains(e.target)) {
+        
+        startMenu.classList.remove('active');
+        startButton.classList.remove('active');
+    }
+});
+
 
 /* 3. ПЕРЕТАСКИВАНИЕ */
 function makeDraggable(el, handle) {
